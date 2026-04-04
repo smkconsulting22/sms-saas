@@ -15,6 +15,9 @@ app.add_middleware(
         "http://localhost:3000",
         "https://*.railway.app",
         "https://*.up.railway.app",
+         "https://sms-saas-frontend.pages.dev",
+        "*"
+       
     ],
     allow_credentials=True,
     allow_methods=["*"],
