@@ -1,0 +1,66 @@
+### Register
+POST http://localhost:8000/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@kbdatasolutions.com",
+  "password": "P@ssw0rd",
+  "full_name": "KOUAME BI Stéphane",
+  "company_name": "KB Data Solutions",
+  "slug": "kb-datasolutions"
+}
+
+### Login
+# @name login
+POST http://localhost:8000/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=test@kbdatasolutions.com&password=P@ssw0rd
+
+### Ajouter crédits de test
+POST http://localhost:8000/sms/credits/add-test
+Authorization: Bearer {{login.response.body.access_token}}
+Content-Type: application/json
+
+### Envoyer un SMS
+POST http://localhost:8000/sms/send
+Authorization: Bearer {{login.response.body.access_token}}
+Content-Type: application/json
+
+{
+  "recipient": "+2250709768110",
+  "message": "Bonjour, ceci est un test depuis mon SaaS SMS !"
+}
+
+### Créer un contact
+POST http://localhost:8000/contacts/
+Authorization: Bearer {{login.response.body.access_token}}
+Content-Type: application/json
+
+{
+  "phone": "+2250502787817",
+  "full_name": "KOFFI Theo"
+}
+
+### Lister les contacts
+GET http://localhost:8000/contacts/
+Authorization: Bearer {{login.response.body.access_token}}
+
+### Créer une campagne
+# @name create_campaign
+POST http://localhost:8000/campaigns/
+Authorization: Bearer {{login.response.body.access_token}}
+Content-Type: application/json
+
+{
+  "name": "Campagne test",
+  "message": "Bonjour {{nom}}, ceci est un message de test !"
+}
+
+### Lancer la campagne (remplacez l'ID)
+POST http://localhost:8000/campaigns/{{create_campaign.response.body.id}}/launch
+Authorization: Bearer {{login.response.body.access_token}}
+
+### Statut de la campagne
+GET http://localhost:8000/campaigns/{{create_campaign.response.body.id}}
+Authorization: Bearer {{login.response.body.access_token}}
