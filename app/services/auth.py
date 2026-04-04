@@ -3,7 +3,7 @@ from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from app.config import settings
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.tenant import Tenant
 from app.models.credit import CreditBalance
 from app.schemas.auth import UserRegister
@@ -34,7 +34,7 @@ def register_user(db: Session, payload: UserRegister) -> User:
         email=payload.email,
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
-        role="admin"
+        role=UserRole.ADMIN
     )
     db.add(user)
 
