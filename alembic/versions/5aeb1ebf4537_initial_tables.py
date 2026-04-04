@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column('email', sa.String(255), nullable=False),
         sa.Column('hashed_password', sa.String(255), nullable=False),
         sa.Column('full_name', sa.String(100)),
-        sa.Column('role', sa.Enum('admin', 'operator', 'viewer', name='userrole'), default='admin'),
+        sa.Column('role', sa.String(20), nullable=False,  default='admin'),
         sa.Column('is_active', sa.Boolean(), default=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
@@ -63,7 +63,7 @@ def upgrade() -> None:
         sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('name', sa.String(100), nullable=False),
         sa.Column('message', sa.Text(), nullable=False),
-        sa.Column('status', sa.Enum('draft', 'running', 'completed', 'failed', name='campaignstatus'), default='draft'),
+        sa.Column('status', sa.String(20), nullable=False,  default='draft'),
         sa.Column('total', sa.Integer(), default=0),
         sa.Column('sent', sa.Integer(), default=0),
         sa.Column('failed', sa.Integer(), default=0),
@@ -92,3 +92,5 @@ def downgrade() -> None:
     op.drop_table('credit_balances')
     op.drop_table('users')
     op.drop_table('tenants')
+    op.execute('DROP TYPE IF EXISTS userrole')
+    op.execute('DROP TYPE IF EXISTS campaignstatus')
