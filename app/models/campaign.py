@@ -19,7 +19,7 @@ class Campaign(Base):
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     name = Column(String(100), nullable=False)
     message = Column(Text, nullable=False)
-    status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
+    status = Column(String(20), default='draft')
     total = Column(Integer, default=0)
     sent = Column(Integer, default=0)
     failed = Column(Integer, default=0)
