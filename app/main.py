@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, sms, contacts, campaigns
+from app.routers import auth, sms, contacts, campaigns, credits, tenants
 
 app = FastAPI(
     title="SMS SaaS API",
@@ -28,6 +28,8 @@ app.include_router(auth.router)
 app.include_router(sms.router)
 app.include_router(contacts.router)
 app.include_router(campaigns.router)
+app.include_router(credits.router)
+app.include_router(tenants.router)
 
 
 @app.get("/")

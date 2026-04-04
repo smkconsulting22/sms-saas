@@ -54,26 +54,3 @@ async def send_single_sms(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur Orange API : {str(e)}")
 
-@router.post("/credits/add-test")
-def add_test_credits(
-    db: Session = Depends(get_db),
-    current: dict = Depends(get_current_tenant)
-):
-    """Endpoint temporaire pour ajouter des crédits de test"""
-    balance = db.query(CreditBalance).filter(
-        CreditBalance.tenant_id == current["tenant_id"]
-    ).first()
-    balance.balance += 10
-    db.commit()
-    return {"message": "10 crédits ajoutés", "balance": balance.balance}
-
-
-@router.get("/credits/balance")
-def get_balance(
-    db: Session = Depends(get_db),
-    current: dict = Depends(get_current_tenant)
-):
-    balance = db.query(CreditBalance).filter(
-        CreditBalance.tenant_id == current["tenant_id"]
-    ).first()
-    return {"balance": balance.balance if balance else 0}
