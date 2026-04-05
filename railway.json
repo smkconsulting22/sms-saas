@@ -5,7 +5,7 @@
   },
   "deploy": {
     "startCommand": "python -m celery -A app.workers.celery_app worker --loglevel=info -P solo",
-    "healthcheckPath": "/health",
+    "healthcheckPath": "",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
