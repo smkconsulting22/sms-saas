@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "bash start.sh",
+    "startCommand": "python -m celery -A app.workers.celery_app worker --loglevel=info -P solo",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
