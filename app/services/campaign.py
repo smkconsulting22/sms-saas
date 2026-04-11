@@ -1,13 +1,19 @@
 import csv
 import io
+import asyncio
+import logging
 import phonenumbers
 import openpyxl
-import asyncio
 from sqlalchemy.orm import Session
 from app.models.contact import Contact
 from app.models.campaign import Campaign, CampaignLog, CampaignStatus
 from app.models.credit import CreditBalance
+from app.models.user import User
+from app.models.tenant import Tenant
 from app.services.orange_sms import send_sms
+
+logger = logging.getLogger(__name__)
+LOW_BALANCE_THRESHOLD = 10
 
 
 def validate_phone(phone: str) -> str | None:
@@ -274,3 +280,20 @@ async def run_campaign(db: Session, campaign_id: str, tenant_id: str):
 
     campaign.status = CampaignStatus.COMPLETED
     db.commit()
+
+    # Alerte solde bas si balance < seuil — non bloquant
+    if balance and balance.balance < LOW_BALANCE_THRESHOLD:
+        try:
+            from app.services.email import send_low_balance_alert
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+            admin = db.query(User).filter(
+                User.tenant_id == tenant_id,
+                User.role == "admin",
+                User.is_active == True,
+            ).first()
+            if tenant and admin:
+                await asyncio.to_thread(
+                    send_low_balance_alert, admin.email, tenant.name, balance.balance
+                )
+        except Exception as exc:
+            logger.error("Erreur alerte solde bas : %s", exc)

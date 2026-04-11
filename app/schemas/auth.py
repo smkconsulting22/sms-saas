@@ -19,3 +19,12 @@ class Token(BaseModel):
 class MakeSuperAdminRequest(BaseModel):
     email: EmailStr
     secret_key: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str

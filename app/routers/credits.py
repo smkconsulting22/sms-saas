@@ -4,8 +4,10 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.credit import CreditBalance, CreditTransaction
 from app.models.tenant import Tenant
+from app.models.user import User
 from app.dependencies import get_current_tenant, require_admin, require_superadmin
 from app.schemas.credit import CreditAddRequest, CreditDeductRequest
+from app.services.email import send_credit_added_email
 
 router = APIRouter(prefix="/credits", tags=["Crédits"])
 
@@ -44,6 +46,20 @@ def add_credits(
     db.add(tx)
     db.commit()
     db.refresh(balance)
+
+    # Email de confirmation au client — non bloquant
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == str(payload.tenant_id)).first()
+        admin = db.query(User).filter(
+            User.tenant_id == str(payload.tenant_id),
+            User.role == "admin",
+            User.is_active == True,
+        ).first()
+        if tenant and admin:
+            send_credit_added_email(admin.email, tenant.name, payload.amount, balance.balance)
+    except Exception:
+        pass
+
     return {"message": f"{payload.amount} crédit(s) ajouté(s)", "balance": balance.balance}
 
 
