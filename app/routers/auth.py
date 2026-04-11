@@ -24,11 +24,11 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 @router.post("/register", status_code=201)
 @limiter.limit("5/minute")
 def register(request: Request, payload: UserRegister, db: Session = Depends(get_db)):
-    try:
-        user = register_user(db, payload)
-        return {"message": "Compte créé", "user_id": str(user.id)}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    """Inscription directe désactivée. Passer par POST /account-requests/ à la place."""
+    raise HTTPException(
+        status_code=403,
+        detail="Les inscriptions directes sont fermées. Soumettez une demande de compte via /account-requests/.",
+    )
 
 
 @router.post("/login", response_model=Token)
