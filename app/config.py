@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ORANGE_CLIENT_SECRET: str
     ORANGE_SENDER_NUMBER: str
     REDIS_URL: str = "redis://localhost:6379"
+    SECRET_ADMIN_KEY: str = "change-me-in-production"
 
     class Config:
         env_file = ".env"

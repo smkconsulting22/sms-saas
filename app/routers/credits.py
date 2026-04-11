@@ -4,22 +4,16 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.credit import CreditBalance, CreditTransaction
 from app.models.tenant import Tenant
-from app.routers.sms import get_current_tenant
+from app.dependencies import get_current_tenant, require_admin, require_superadmin
 from app.schemas.credit import CreditAddRequest, CreditDeductRequest
 
 router = APIRouter(prefix="/credits", tags=["Crédits"])
 
 
-def require_admin(current: dict = Depends(get_current_tenant)):
-    if current.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
-    return current
-
-
 @router.get("/balance")
 def get_balance(
     db: Session = Depends(get_db),
-    current: dict = Depends(get_current_tenant),
+    current: dict = Depends(require_admin),
 ):
     balance = db.query(CreditBalance).filter(
         CreditBalance.tenant_id == current["tenant_id"]
@@ -31,7 +25,7 @@ def get_balance(
 def add_credits(
     payload: CreditAddRequest,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     balance = db.query(CreditBalance).filter(
         CreditBalance.tenant_id == str(payload.tenant_id)
@@ -57,7 +51,7 @@ def add_credits(
 def deduct_credits(
     payload: CreditDeductRequest,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     balance = db.query(CreditBalance).filter(
         CreditBalance.tenant_id == str(payload.tenant_id)
@@ -83,7 +77,7 @@ def get_history(
     page: int = 1,
     limit: int = 20,
     db: Session = Depends(get_db),
-    current: dict = Depends(get_current_tenant),
+    current: dict = Depends(require_admin),
 ):
     offset = (page - 1) * limit
     total = db.query(func.count(CreditTransaction.id)).filter(
@@ -119,7 +113,7 @@ def get_history(
 @router.get("/all-balances")
 def get_all_balances(
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     results = (
         db.query(

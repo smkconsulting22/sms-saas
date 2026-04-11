@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from app.database import get_db
 from app.models.campaign import Campaign, CampaignStatus
 from app.schemas.campaign import CampaignCreate, CampaignOut
-from app.routers.sms import get_current_tenant
+from app.dependencies import get_current_tenant
 from app.services.campaign import run_campaign
 from app.tasks.sms_tasks import launch_campaign_task
 

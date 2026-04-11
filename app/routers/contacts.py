@@ -4,7 +4,7 @@ from typing import List
 from app.database import get_db
 from app.models.contact import Contact
 from app.schemas.contact import ContactCreate, ContactOut
-from app.routers.sms import get_current_tenant
+from app.dependencies import get_current_tenant
 from app.services.campaign import (
     import_contacts_from_csv,
     import_contacts_from_excel,

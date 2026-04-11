@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.credit import CreditBalance
 from app.models.contact import Contact
 from app.models.campaign import Campaign
-from app.routers.credits import require_admin
+from app.dependencies import require_superadmin
 from app.schemas.tenant import TenantUpdate
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
@@ -20,7 +20,7 @@ def list_tenants(
     limit: int = 20,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     q = db.query(Tenant)
     if search:
@@ -60,7 +60,7 @@ def list_tenants(
 def get_tenant(
     tenant_id: str,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
@@ -107,7 +107,7 @@ def update_tenant(
     tenant_id: str,
     payload: TenantUpdate,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
@@ -127,7 +127,7 @@ def update_tenant(
 def get_tenant_users(
     tenant_id: str,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
@@ -151,7 +151,7 @@ def get_tenant_users(
 def get_tenant_stats(
     tenant_id: str,
     db: Session = Depends(get_db),
-    current: dict = Depends(require_admin),
+    current: dict = Depends(require_superadmin),
 ):
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:

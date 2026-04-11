@@ -1,22 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
-from fastapi.security import OAuth2PasswordBearer
 from app.database import get_db
 from app.schemas.sms import SMSSend, SMSResponse
 from app.services.orange_sms import send_sms
 from app.models.credit import CreditBalance
-from app.config import settings
+from app.dependencies import get_current_tenant
 
 router = APIRouter(prefix="/sms", tags=["SMS"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-def get_current_tenant(token: str = Depends(oauth2_scheme)) -> dict:
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token invalide")
 
 @router.post("/send", response_model=SMSResponse)
 async def send_single_sms(
