@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_TLS: bool = True
     FRONTEND_URL: str = "http://localhost:5173"
+    SENTRY_DSN: str = ""
 
     class Config:
         env_file = ".env"

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from itsdangerous import SignatureExpired, BadSignature
@@ -16,6 +17,7 @@ from app.models.user import User
 from app.config import settings
 from app.dependencies import limiter
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentification"])
 
 
@@ -34,10 +36,12 @@ def register(request: Request, payload: UserRegister, db: Session = Depends(get_
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form.username, form.password)
     if not user:
+        logger.warning("Échec connexion pour email=%s", form.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect"
+            detail="Email ou mot de passe incorrect",
         )
+    logger.info("Connexion réussie user=%s tenant=%s", user.email, user.tenant_id)
     token = create_access_token({
         "user_id": str(user.id),
         "tenant_id": str(user.tenant_id),

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -9,6 +10,7 @@ from app.dependencies import get_current_tenant, require_admin, require_superadm
 from app.schemas.credit import CreditAddRequest, CreditDeductRequest
 from app.services.email import send_credit_added_email
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/credits", tags=["Crédits"])
 
 
@@ -46,6 +48,10 @@ def add_credits(
     db.add(tx)
     db.commit()
     db.refresh(balance)
+    logger.info(
+        "Crédits ajoutés : tenant=%s amount=%d new_balance=%d",
+        payload.tenant_id, payload.amount, balance.balance,
+    )
 
     # Email de confirmation au client — non bloquant
     try:

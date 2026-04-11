@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -20,6 +21,7 @@ from app.services.email import (
 )
 from app.config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/recharge", tags=["Rechargements"])
 
 
@@ -62,6 +64,10 @@ def create_recharge_request(
     db.add(req)
     db.commit()
     db.refresh(req)
+    logger.info(
+        "Demande rechargement créée id=%s tenant=%s amount=%d method=%s",
+        req.id, tenant_id, payload.amount_requested, payload.payment_method,
+    )
 
     # Notifier le super admin — non bloquant
     try:
@@ -195,6 +201,10 @@ def approve_request(
     db.commit()
     db.refresh(balance)
     db.refresh(req)
+    logger.info(
+        "Rechargement approuvé id=%s tenant=%s amount=%d new_balance=%d",
+        request_id, req.tenant_id, req.amount_requested, balance.balance,
+    )
 
     # Notifier le client — non bloquant
     try:
@@ -240,6 +250,10 @@ def reject_request(
     req.note = payload.reason
     db.commit()
     db.refresh(req)
+    logger.info(
+        "Rechargement rejeté id=%s tenant=%s reason=%s",
+        request_id, req.tenant_id, payload.reason[:50],
+    )
 
     # Notifier le client — non bloquant
     try:

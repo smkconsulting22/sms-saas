@@ -2,6 +2,7 @@ alembic==1.18.4
 emails==0.6
 itsdangerous==2.2.0
 Jinja2==3.1.6
+sentry-sdk[fastapi]==2.25.1
 slowapi==0.1.9
 amqp==5.3.1
 annotated-doc==0.0.4

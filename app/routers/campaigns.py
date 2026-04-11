@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -9,6 +10,7 @@ from app.dependencies import get_current_tenant
 from app.services.campaign import run_campaign
 from app.tasks.sms_tasks import launch_campaign_task
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/campaigns", tags=["Campagnes"])
 
 @router.post("/", response_model=CampaignOut, status_code=201)
@@ -68,21 +70,30 @@ async def launch_campaign(
         raise HTTPException(status_code=400, detail="Campagne déjà en cours")
 
     if campaign.scheduled_at and campaign.scheduled_at > datetime.now(timezone.utc):
-        # Envoi planifié via Celery
         launch_campaign_task.apply_async(
             args=[str(campaign.id), current["tenant_id"]],
-            eta=campaign.scheduled_at
+            eta=campaign.scheduled_at,
+        )
+        logger.info(
+            "Campagne planifiée campaign_id=%s tenant=%s eta=%s",
+            campaign_id,
+            current["tenant_id"],
+            campaign.scheduled_at.isoformat(),
         )
         return {
             "message": f"Campagne planifiée pour le {campaign.scheduled_at.strftime('%d/%m/%Y à %H:%M')}",
-            "campaign_id": campaign_id
+            "campaign_id": campaign_id,
         }
     else:
-        # Envoi immédiat via Celery — ne bloque pas la requête HTTP
         launch_campaign_task.delay(str(campaign.id), current["tenant_id"])
+        logger.info(
+            "Campagne lancée immédiatement campaign_id=%s tenant=%s",
+            campaign_id,
+            current["tenant_id"],
+        )
         return {
             "message": "Campagne lancée en arrière-plan",
-            "campaign_id": campaign_id
+            "campaign_id": campaign_id,
         }
     
     
