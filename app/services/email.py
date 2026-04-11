@@ -102,6 +102,115 @@ def send_low_balance_alert(to: str, tenant_name: str, balance: int) -> None:
     send_email(to, f"⚠️ Solde bas — {balance} crédit(s) restant(s)", html)
 
 
+def send_recharge_notification_superadmin(
+    to: str,
+    tenant_name: str,
+    amount_requested: int,
+    amount_paid: str,
+    payment_method: str,
+    payment_reference: str,
+    dashboard_url: str,
+) -> None:
+    method_label = "Orange Money" if payment_method == "orange_money" else "Wave"
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#f0f9ff">
+      <h2 style="color:#0369a1">🔔 Nouvelle demande de rechargement</h2>
+      <p>Une nouvelle demande de rechargement a été soumise par <strong>{tenant_name}</strong>.</p>
+      <table style="margin:24px 0;border-collapse:collapse;width:100%">
+        <tr style="background:#e0f2fe">
+          <td style="padding:10px;border:1px solid #7dd3fc">Client</td>
+          <td style="padding:10px;border:1px solid #7dd3fc;font-weight:bold">{tenant_name}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #7dd3fc">Crédits demandés</td>
+          <td style="padding:10px;border:1px solid #7dd3fc;font-weight:bold">{amount_requested}</td>
+        </tr>
+        <tr style="background:#e0f2fe">
+          <td style="padding:10px;border:1px solid #7dd3fc">Montant payé</td>
+          <td style="padding:10px;border:1px solid #7dd3fc;font-weight:bold">{amount_paid} FCFA</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #7dd3fc">Méthode</td>
+          <td style="padding:10px;border:1px solid #7dd3fc">{method_label}</td>
+        </tr>
+        <tr style="background:#e0f2fe">
+          <td style="padding:10px;border:1px solid #7dd3fc">Référence</td>
+          <td style="padding:10px;border:1px solid #7dd3fc;font-family:monospace">{payment_reference}</td>
+        </tr>
+      </table>
+      <p style="margin:32px 0">
+        <a href="{dashboard_url}"
+           style="background:#0369a1;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">
+          Traiter la demande
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">SMS SaaS CI — Notification automatique</p>
+    </div>
+    """
+    send_email(to, f"[SMS SaaS CI] Nouvelle demande de rechargement — {tenant_name}", html)
+
+
+def send_recharge_approved_email(
+    to: str, tenant_name: str, amount_requested: int, new_balance: int, note: str | None
+) -> None:
+    note_block = (
+        f'<p style="background:#f0fdf4;padding:12px;border-left:4px solid #16a34a;margin:16px 0">'
+        f'<strong>Note :</strong> {note}</p>'
+    ) if note else ""
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#f0fdf4">
+      <h2 style="color:#16a34a">✅ Demande de rechargement approuvée</h2>
+      <p>Bonjour,</p>
+      <p>Votre demande de rechargement pour le compte <strong>{tenant_name}</strong> a été approuvée.</p>
+      <table style="margin:24px 0;border-collapse:collapse;width:100%">
+        <tr style="background:#dcfce7">
+          <td style="padding:12px;border:1px solid #86efac">Crédits ajoutés</td>
+          <td style="padding:12px;border:1px solid #86efac;font-weight:bold;color:#16a34a">+{amount_requested}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #86efac">Nouveau solde</td>
+          <td style="padding:12px;border:1px solid #86efac;font-weight:bold">{new_balance} crédit(s)</td>
+        </tr>
+      </table>
+      {note_block}
+      <p style="margin:32px 0">
+        <a href="{settings.FRONTEND_URL}/dashboard"
+           style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">
+          Accéder à mon compte
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">L'équipe SMS SaaS CI</p>
+    </div>
+    """
+    send_email(to, f"✅ Rechargement approuvé — {amount_requested} crédit(s) ajouté(s)", html)
+
+
+def send_recharge_rejected_email(
+    to: str, tenant_name: str, amount_requested: int, reason: str
+) -> None:
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#fff1f2">
+      <h2 style="color:#dc2626">❌ Demande de rechargement refusée</h2>
+      <p>Bonjour,</p>
+      <p>Votre demande de rechargement de <strong>{amount_requested} crédit(s)</strong>
+         pour le compte <strong>{tenant_name}</strong> n'a pas pu être traitée.</p>
+      <div style="background:#fee2e2;padding:16px;border-left:4px solid #dc2626;margin:24px 0;border-radius:4px">
+        <strong>Motif du refus :</strong><br>{reason}
+      </div>
+      <p>Si vous pensez qu'il s'agit d'une erreur ou souhaitez soumettre une nouvelle demande,
+         contactez notre support ou recommencez via votre espace client.</p>
+      <p style="margin:32px 0">
+        <a href="{settings.FRONTEND_URL}/dashboard/credits"
+           style="background:#dc2626;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">
+          Soumettre une nouvelle demande
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">L'équipe SMS SaaS CI</p>
+    </div>
+    """
+    send_email(to, f"❌ Demande de rechargement refusée — {tenant_name}", html)
+
+
 def send_credit_added_email(to: str, tenant_name: str, amount: int, new_balance: int) -> None:
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#f0fdf4">

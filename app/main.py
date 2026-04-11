@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.routers import auth, sms, contacts, campaigns, credits, tenants
+from app.routers import auth, sms, contacts, campaigns, credits, tenants, recharge
 from app.dependencies import limiter
 
 app = FastAPI(
@@ -42,6 +42,7 @@ app.include_router(contacts.router)
 app.include_router(campaigns.router)
 app.include_router(credits.router)
 app.include_router(tenants.router)
+app.include_router(recharge.router)
 
 
 @app.get("/")
