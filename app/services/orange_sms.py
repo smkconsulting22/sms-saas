@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Optional
 import httpx
 import phonenumbers
 from app.services.orange_token import get_orange_token
@@ -26,7 +27,9 @@ def get_sender_address() -> str:
     return settings.ORANGE_SENDER_NUMBER.replace("+", "")
 
 
-async def _send_sms_once(formatted_recipient: str, message: str) -> dict:
+async def _send_sms_once(
+    formatted_recipient: str, message: str, sender_name: Optional[str] = None
+) -> dict:
     """Une tentative d'envoi : gère le token, la requête HTTP et le refresh 401."""
     token = await get_orange_token()
     sender = get_sender_address()
@@ -36,7 +39,7 @@ async def _send_sms_once(formatted_recipient: str, message: str) -> dict:
         "outboundSMSMessageRequest": {
             "address": f"tel:{formatted_recipient}",
             "senderAddress": f"tel:+{sender}",
-            "senderName": "RESAFIG",
+            "senderName": sender_name or "RESAFIG",
             "outboundSMSTextMessage": {"message": message},
         }
     }
@@ -62,14 +65,20 @@ async def _send_sms_once(formatted_recipient: str, message: str) -> dict:
         return response.json()
 
 
-async def send_sms(recipient: str, message: str, tenant_id: str = "") -> dict:
+async def send_sms(
+    recipient: str,
+    message: str,
+    tenant_id: str = "",
+    sender_name: Optional[str] = None,
+) -> dict:
     """Envoie un SMS avec jusqu'à 3 tentatives.
 
-    Délais entre tentatives : 1s puis 3s.
-    Lève l'exception après 3 échecs consécutifs.
+    - sender_name : nom affiché (1-11 car. alphanum). Utilise 'RESAFIG' si absent.
+    - Délais entre tentatives : 1s puis 3s.
+    - Lève l'exception après 3 échecs consécutifs.
     """
     formatted_recipient = format_number(recipient)
-    ctx = f"recipient={formatted_recipient} tenant={tenant_id or 'n/a'}"
+    ctx = f"recipient={formatted_recipient} tenant={tenant_id or 'n/a'} sender={sender_name or 'RESAFIG'}"
     last_exc: Exception = RuntimeError("Aucune tentative effectuée")
 
     for attempt in range(1, 4):
@@ -81,7 +90,7 @@ async def send_sms(recipient: str, message: str, tenant_id: str = "") -> dict:
             logger.info("SMS envoi tentative 1/3 — %s", ctx)
 
         try:
-            result = await _send_sms_once(formatted_recipient, message)
+            result = await _send_sms_once(formatted_recipient, message, sender_name)
             logger.info("SMS envoyé avec succès (tentative %d/3) — %s", attempt, ctx)
             return result
         except httpx.HTTPStatusError as exc:

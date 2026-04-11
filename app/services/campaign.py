@@ -240,6 +240,10 @@ async def run_campaign(db: Session, campaign_id: str, tenant_id: str):
         db.commit()
         return
 
+    # Récupérer le sender_name personnalisé du tenant (None → fallback "RESAFIG")
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    sender_name = tenant.sender_name if tenant else None
+
     campaign.status = CampaignStatus.RUNNING
     campaign.total = len(contacts)
     db.commit()
@@ -250,7 +254,7 @@ async def run_campaign(db: Session, campaign_id: str, tenant_id: str):
         )
 
         try:
-            result = await send_sms(contact.phone, message)
+            result = await send_sms(contact.phone, message, tenant_id=tenant_id, sender_name=sender_name)
             resource_url = result.get(
                 "outboundSMSMessageRequest", {}
             ).get("resourceURL", "")

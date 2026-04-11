@@ -6,6 +6,7 @@ from app.schemas.sms import SMSSend, SMSResponse
 from app.services.orange_sms import send_sms
 from app.models.credit import CreditBalance
 from app.models.campaign import CampaignLog
+from app.models.tenant import Tenant
 from app.dependencies import get_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,14 @@ async def send_single_sms(
         logger.warning("Crédits insuffisants pour envoi SMS tenant=%s", tenant_id)
         raise HTTPException(status_code=402, detail="Crédits insuffisants")
 
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    sender_name = tenant.sender_name if tenant else None
+
     try:
-        result = await send_sms(payload.recipient, payload.message, tenant_id=tenant_id)
+        result = await send_sms(
+            payload.recipient, payload.message,
+            tenant_id=tenant_id, sender_name=sender_name,
+        )
 
         balance.balance -= 1
         db.commit()

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,11 +9,72 @@ from app.models.user import User
 from app.models.credit import CreditBalance
 from app.models.contact import Contact
 from app.models.campaign import Campaign
-from app.dependencies import require_superadmin
-from app.schemas.tenant import TenantUpdate
+from app.dependencies import require_admin, require_superadmin
+from app.schemas.tenant import TenantUpdate, SenderNameUpdate
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
+
+# ── Endpoints client (require_admin) ─────────────────────────────────────────
+# IMPORTANT : déclarés avant /{tenant_id} pour éviter que "me" soit capturé
+# comme un paramètre de chemin.
+
+@router.get("/me")
+def get_my_tenant(
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_admin),
+):
+    """Retourne les informations du tenant de l'utilisateur connecté."""
+    tenant_id = current["tenant_id"]
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+
+    balance = db.query(CreditBalance).filter(CreditBalance.tenant_id == tenant_id).first()
+    contacts_count = (
+        db.query(func.count(Contact.id)).filter(Contact.tenant_id == tenant_id).scalar() or 0
+    )
+    campaigns_count = (
+        db.query(func.count(Campaign.id)).filter(Campaign.tenant_id == tenant_id).scalar() or 0
+    )
+
+    return {
+        "id": str(tenant.id),
+        "name": tenant.name,
+        "slug": tenant.slug,
+        "is_active": tenant.is_active,
+        "sender_name": tenant.sender_name,
+        "created_at": tenant.created_at,
+        "credits_balance": balance.balance if balance else 0,
+        "contacts_count": contacts_count,
+        "campaigns_count": campaigns_count,
+    }
+
+
+@router.patch("/me/sender-name")
+def update_my_sender_name(
+    payload: SenderNameUpdate,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_admin),
+):
+    """Permet au client admin de définir son propre sender name (1-11 car. alphanumériques)."""
+    tenant_id = current["tenant_id"]
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+
+    tenant.sender_name = payload.sender_name
+    db.commit()
+    db.refresh(tenant)
+    logger.info("Sender name mis à jour tenant=%s sender_name=%s", tenant_id, payload.sender_name)
+    return {
+        "message": "Sender name mis à jour",
+        "sender_name": tenant.sender_name,
+    }
+
+
+# ── Endpoints super admin (require_superadmin) ────────────────────────────────
 
 @router.get("/")
 def list_tenants(
@@ -46,6 +108,7 @@ def list_tenants(
                 "name": t.name,
                 "slug": t.slug,
                 "is_active": t.is_active,
+                "sender_name": t.sender_name,
                 "created_at": t.created_at,
                 "credits_balance": balance.balance if balance else 0,
                 "contacts_count": contacts_count,
@@ -83,6 +146,7 @@ def get_tenant(
         "name": tenant.name,
         "slug": tenant.slug,
         "is_active": tenant.is_active,
+        "sender_name": tenant.sender_name,
         "created_at": tenant.created_at,
         "credits_balance": balance.balance if balance else 0,
         "contacts_count": contacts_count,
@@ -120,7 +184,13 @@ def update_tenant(
 
     db.commit()
     db.refresh(tenant)
-    return {"message": "Tenant mis à jour", "id": str(tenant.id), "name": tenant.name, "is_active": tenant.is_active}
+    return {
+        "message": "Tenant mis à jour",
+        "id": str(tenant.id),
+        "name": tenant.name,
+        "is_active": tenant.is_active,
+        "sender_name": tenant.sender_name,
+    }
 
 
 @router.get("/{tenant_id}/users")
