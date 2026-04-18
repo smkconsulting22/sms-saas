@@ -1,4 +1,5 @@
 import logging
+import traceback
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -108,28 +109,37 @@ def update_campaign(
     db: Session = Depends(get_db),
     current: dict = Depends(require_admin),
 ):
-    campaign = db.query(Campaign).filter(
-        Campaign.id == campaign_id,
-        Campaign.tenant_id == current["tenant_id"],
-    ).first()
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campagne introuvable")
-    if campaign.status != "draft":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Impossible de modifier une campagne au statut '{campaign.status}' (draft requis)",
+    try:
+        campaign = db.query(Campaign).filter(
+            Campaign.id == campaign_id,
+            Campaign.tenant_id == current["tenant_id"],
+        ).first()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campagne introuvable")
+        if campaign.status not in ("draft", "scheduled"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Impossible de modifier une campagne au statut '{campaign.status}' (draft ou scheduled requis)",
+            )
+        if payload.name is not None:
+            campaign.name = payload.name
+        if payload.message is not None:
+            campaign.message = payload.message
+        if payload.scheduled_at is not None:
+            campaign.scheduled_at = payload.scheduled_at
+            campaign.status = "scheduled"
+        db.commit()
+        db.refresh(campaign)
+        logger.info("Campagne modifiée campaign_id=%s tenant=%s", campaign_id, current["tenant_id"])
+        return campaign
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error(
+            "Erreur PATCH campagne campaign_id=%s tenant=%s :\n%s",
+            campaign_id, current.get("tenant_id"), traceback.format_exc(),
         )
-    if payload.name is not None:
-        campaign.name = payload.name
-    if payload.message is not None:
-        campaign.message = payload.message
-    if payload.scheduled_at is not None:
-        campaign.scheduled_at = payload.scheduled_at
-        campaign.status = "scheduled"
-    db.commit()
-    db.refresh(campaign)
-    logger.info("Campagne modifiée campaign_id=%s tenant=%s", campaign_id, current["tenant_id"])
-    return campaign
+        raise HTTPException(status_code=500, detail="Erreur lors de la modification de la campagne")
 
 
 @router.post("/{campaign_id}/relaunch")
