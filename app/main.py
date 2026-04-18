@@ -23,7 +23,7 @@ if settings.SENTRY_DSN:
     )
 
 app = FastAPI(
-    title="SMS SaaS API",
+    title="WidoZan API",
     description="Plateforme d'envoi de SMS via Orange",
     version="1.0.0",
 )
