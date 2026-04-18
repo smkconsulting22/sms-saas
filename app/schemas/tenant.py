@@ -1,6 +1,7 @@
 import re
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
+from decimal import Decimal
 
 _SENDER_NAME_RE = re.compile(r'^[a-zA-Z0-9]{1,11}$')
 
@@ -8,6 +9,7 @@ _SENDER_NAME_RE = re.compile(r'^[a-zA-Z0-9]{1,11}$')
 class TenantUpdate(BaseModel):
     name: Optional[str] = None
     is_active: Optional[bool] = None
+    sms_price: Optional[Decimal] = Field(default=None, ge=1, le=999, description="Prix par SMS en FCFA")
 
 
 class SenderNameUpdate(BaseModel):

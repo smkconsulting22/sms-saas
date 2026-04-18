@@ -1,5 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends
+from decimal import Decimal
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from datetime import datetime, timezone, timedelta
@@ -10,6 +11,8 @@ from app.models.campaign import Campaign, CampaignLog
 from app.models.credit import CreditBalance, CreditTransaction
 from app.models.recharge_request import RechargeRequest
 from app.models.account_request import AccountRequest
+from app.models.tenant_pricing import TenantPricing
+from app.schemas.tenant_pricing import TenantPricingSet, TenantPricingOut
 from app.dependencies import require_superadmin
 
 logger = logging.getLogger(__name__)
@@ -115,6 +118,120 @@ def admin_dashboard(
         "sms_per_day": sms_per_day,
         "credits_per_day": credits_per_day,
     }
+
+
+def _pricing_to_dict(pricing: TenantPricing) -> dict:
+    discount = Decimal(str(pricing.discount_percent or 0))
+    base = Decimal(str(pricing.price_per_sms))
+    effective = base * (1 - discount / 100)
+    return {
+        "tenant_id": str(pricing.tenant_id),
+        "tier": pricing.tier,
+        "price_per_sms": pricing.price_per_sms,
+        "min_recharge_credits": pricing.min_recharge_credits,
+        "discount_percent": pricing.discount_percent,
+        "effective_price_per_sms": round(effective, 2),
+        "updated_at": pricing.updated_at,
+    }
+
+
+@router.get("/tenants/{tenant_id}/pricing")
+def get_tenant_pricing(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_superadmin),
+):
+    """Retourne la grille tarifaire d'un tenant (super admin)."""
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+
+    pricing = db.query(TenantPricing).filter(TenantPricing.tenant_id == tenant_id).first()
+    if not pricing:
+        # Valeurs par défaut si aucune grille n'a été définie
+        return {
+            "tenant_id": tenant_id,
+            "tier": "custom",
+            "price_per_sms": 25,
+            "min_recharge_credits": 100,
+            "discount_percent": "0.00",
+            "effective_price_per_sms": "25.00",
+            "updated_at": None,
+        }
+    return _pricing_to_dict(pricing)
+
+
+@router.put("/tenants/{tenant_id}/pricing")
+def set_tenant_pricing(
+    tenant_id: str,
+    payload: TenantPricingSet,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_superadmin),
+):
+    """Définit ou met à jour la grille tarifaire d'un tenant (upsert)."""
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+
+    pricing = db.query(TenantPricing).filter(TenantPricing.tenant_id == tenant_id).first()
+    if pricing:
+        pricing.tier = payload.tier
+        pricing.price_per_sms = payload.price_per_sms
+        pricing.min_recharge_credits = payload.min_recharge_credits
+        pricing.discount_percent = payload.discount_percent
+    else:
+        pricing = TenantPricing(
+            tenant_id=tenant_id,
+            tier=payload.tier,
+            price_per_sms=payload.price_per_sms,
+            min_recharge_credits=payload.min_recharge_credits,
+            discount_percent=payload.discount_percent,
+        )
+        db.add(pricing)
+
+    db.commit()
+    db.refresh(pricing)
+    logger.info(
+        "Pricing mis à jour tenant=%s tier=%s price=%d discount=%s%% par super_admin=%s",
+        tenant_id, payload.tier, payload.price_per_sms,
+        payload.discount_percent, current.get("user_id"),
+    )
+    return _pricing_to_dict(pricing)
+
+
+@router.get("/pricing/tiers")
+def list_pricing_tiers(current: dict = Depends(require_superadmin)):
+    """Retourne la grille tarifaire de référence par segment."""
+    return [
+        {
+            "tier": "boutique",
+            "label": "Boutiques / Petites structures",
+            "description": "< 1 000 SMS / mois",
+            "price_per_sms": 20,
+            "min_recharge_credits": 100,
+        },
+        {
+            "tier": "pme",
+            "label": "PME",
+            "description": "1 000 – 10 000 SMS / mois",
+            "price_per_sms": 17,
+            "min_recharge_credits": 500,
+        },
+        {
+            "tier": "enterprise",
+            "label": "Grandes entreprises",
+            "description": "> 10 000 SMS / mois",
+            "price_per_sms": 12,
+            "min_recharge_credits": 2000,
+        },
+        {
+            "tier": "custom",
+            "label": "Tarif négocié",
+            "description": "Prix personnalisé",
+            "price_per_sms": 25,
+            "min_recharge_credits": 100,
+        },
+    ]
 
 
 @router.get("/tenants/{tenant_id}/consumption")

@@ -54,10 +54,19 @@ def create_recharge_request(
     tenant_id = current["tenant_id"]
 
     try:
+        # Calculer amount_paid depuis sms_price du tenant si non fourni
+        tenant_for_price = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        sms_price = float(tenant_for_price.sms_price) if (tenant_for_price and tenant_for_price.sms_price) else 20.0
+        computed_amount_paid = (
+            payload.amount_paid
+            if payload.amount_paid is not None
+            else round(payload.amount_requested * sms_price, 2)
+        )
+
         req = RechargeRequest(
             tenant_id=tenant_id,
             amount_requested=payload.amount_requested,
-            amount_paid=payload.amount_paid,
+            amount_paid=computed_amount_paid,
             payment_method=payload.payment_method,
             payment_reference=payload.payment_reference,
             status="pending",
@@ -186,6 +195,11 @@ def approve_request(
             status_code=400,
             detail=f"Impossible d'approuver une demande au statut '{req.status}'"
         )
+
+    # Recalculer amount_paid depuis sms_price du tenant
+    tenant_for_price = db.query(Tenant).filter(Tenant.id == str(req.tenant_id)).first()
+    sms_price = float(tenant_for_price.sms_price) if (tenant_for_price and tenant_for_price.sms_price) else 20.0
+    req.amount_paid = round(req.amount_requested * sms_price, 2)
 
     # Créditer le tenant
     balance = db.query(CreditBalance).filter(

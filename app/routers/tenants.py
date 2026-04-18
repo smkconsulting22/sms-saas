@@ -45,10 +45,29 @@ def get_my_tenant(
         "slug": tenant.slug,
         "is_active": tenant.is_active,
         "sender_name": tenant.sender_name,
+        "sms_price": float(tenant.sms_price) if tenant.sms_price is not None else 20.0,
         "created_at": tenant.created_at,
         "credits_balance": balance.balance if balance else 0,
         "contacts_count": contacts_count,
         "campaigns_count": campaigns_count,
+    }
+
+
+@router.get("/me/pricing")
+def get_my_pricing(
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_admin),
+):
+    """Retourne le prix SMS appliqué au tenant connecté."""
+    tenant_id = current["tenant_id"]
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+    sms_price = float(tenant.sms_price) if tenant.sms_price is not None else 20.0
+    return {
+        "sms_price": sms_price,
+        "currency": "FCFA",
+        "description": f"1 crédit SMS = {sms_price} FCFA",
     }
 
 
@@ -102,19 +121,18 @@ def list_tenants(
         campaigns_count = (
             db.query(func.count(Campaign.id)).filter(Campaign.tenant_id == t.id).scalar() or 0
         )
-        items.append(
-            {
-                "id": str(t.id),
-                "name": t.name,
-                "slug": t.slug,
-                "is_active": t.is_active,
-                "sender_name": t.sender_name,
-                "created_at": t.created_at,
-                "credits_balance": balance.balance if balance else 0,
-                "contacts_count": contacts_count,
-                "campaigns_count": campaigns_count,
-            }
-        )
+        items.append({
+            "id": str(t.id),
+            "name": t.name,
+            "slug": t.slug,
+            "is_active": t.is_active,
+            "sender_name": t.sender_name,
+            "sms_price": float(t.sms_price) if t.sms_price is not None else 20.0,
+            "created_at": t.created_at,
+            "credits_balance": balance.balance if balance else 0,
+            "contacts_count": contacts_count,
+            "campaigns_count": campaigns_count,
+        })
 
     return {"total": total, "page": page, "pages": max(1, (total + limit - 1) // limit), "items": items}
 
@@ -147,6 +165,7 @@ def get_tenant(
         "slug": tenant.slug,
         "is_active": tenant.is_active,
         "sender_name": tenant.sender_name,
+        "sms_price": float(tenant.sms_price) if tenant.sms_price is not None else 20.0,
         "created_at": tenant.created_at,
         "credits_balance": balance.balance if balance else 0,
         "contacts_count": contacts_count,
@@ -181,6 +200,12 @@ def update_tenant(
         tenant.name = payload.name
     if payload.is_active is not None:
         tenant.is_active = payload.is_active
+    if payload.sms_price is not None:
+        tenant.sms_price = payload.sms_price
+        logger.info(
+            "sms_price mis à jour tenant=%s price=%s par super_admin=%s",
+            tenant_id, payload.sms_price, current.get("user_id"),
+        )
 
     db.commit()
     db.refresh(tenant)
@@ -190,6 +215,7 @@ def update_tenant(
         "name": tenant.name,
         "is_active": tenant.is_active,
         "sender_name": tenant.sender_name,
+        "sms_price": float(tenant.sms_price) if tenant.sms_price is not None else 20.0,
     }
 
 
