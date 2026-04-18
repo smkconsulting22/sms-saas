@@ -35,6 +35,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:4173",
+        "https://widozan.kbdatasolutions.com",
+        "https://api.widozan.kbdatasolutions.com",
         "https://sms-saas-frontend-production.up.railway.app",
     ],
     # allow_origins=[
