@@ -6,6 +6,11 @@ class ContactCreate(BaseModel):
     phone: str
     full_name: Optional[str] = None
 
+class ContactUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    is_optout: Optional[bool] = None
+
 class ContactOut(BaseModel):
     id: UUID
     phone: str

@@ -32,7 +32,7 @@ def _recharge_to_dict(req: RechargeRequest, tenant_name: Optional[str] = None) -
         "tenant_id": str(req.tenant_id),
         "tenant_name": tenant_name,
         "amount_requested": req.amount_requested,
-        "amount_paid": str(req.amount_paid),
+        "amount_paid": float(req.amount_paid) if req.amount_paid is not None else None,
         "payment_method": req.payment_method,
         "payment_reference": req.payment_reference,
         "status": req.status,

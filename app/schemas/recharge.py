@@ -29,7 +29,7 @@ class RechargeRequestOut(BaseModel):
     tenant_id: UUID
     tenant_name: Optional[str] = None
     amount_requested: int
-    amount_paid: Decimal
+    amount_paid: Optional[Decimal] = None
     payment_method: str
     payment_reference: str
     status: str
