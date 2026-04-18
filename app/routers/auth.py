@@ -1,4 +1,5 @@
 import logging
+import traceback
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from itsdangerous import SignatureExpired, BadSignature
@@ -6,16 +7,16 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.auth import (
     UserRegister, Token, MakeSuperAdminRequest,
-    ForgotPasswordRequest, ResetPasswordRequest,
+    ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
 )
 from app.services.auth import (
     register_user, authenticate_user, create_access_token,
-    generate_reset_token, verify_reset_token, hash_password,
+    generate_reset_token, verify_reset_token, hash_password, verify_password,
 )
 from app.services.email import send_password_reset_email
 from app.models.user import User
 from app.config import settings
-from app.dependencies import limiter
+from app.dependencies import limiter, get_current_tenant, require_superadmin
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentification"])
@@ -94,3 +95,72 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     user.hashed_password = hash_password(payload.new_password)
     db.commit()
     return {"message": "Mot de passe mis à jour avec succès"}
+
+
+@router.patch("/password")
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current: dict = Depends(get_current_tenant),
+):
+    """Change le mot de passe de l'utilisateur connecté."""
+    try:
+        user = db.query(User).filter(User.id == current["user_id"]).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+        if not verify_password(payload.current_password, user.hashed_password):
+            logger.warning("Tentative changement mdp avec mauvais mot de passe actuel user=%s", user.email)
+            raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
+
+        user.hashed_password = hash_password(payload.new_password)
+        if hasattr(user, "password_changed"):
+            user.password_changed = True
+        db.commit()
+        logger.info("Mot de passe changé avec succès user=%s", user.email)
+        return {"message": "Mot de passe mis à jour avec succès"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Erreur changement mot de passe user=%s :\n%s", current.get("user_id"), traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Erreur lors du changement de mot de passe")
+
+
+@router.get("/superadmins")
+def list_superadmins(
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_superadmin),
+):
+    """Liste tous les super administrateurs."""
+    admins = db.query(User).filter(User.is_superadmin == True).all()
+    return [
+        {
+            "id": str(u.id),
+            "email": u.email,
+            "full_name": u.full_name,
+            "tenant_id": str(u.tenant_id),
+            "is_active": u.is_active,
+            "created_at": u.created_at,
+        }
+        for u in admins
+    ]
+
+
+@router.delete("/superadmins/{user_id}")
+def revoke_superadmin(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_superadmin),
+):
+    """Révoque les droits super admin d'un utilisateur."""
+    if user_id == current["user_id"]:
+        raise HTTPException(status_code=400, detail="Impossible de révoquer vos propres droits super admin")
+
+    user = db.query(User).filter(User.id == user_id, User.is_superadmin == True).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Super admin introuvable")
+
+    user.is_superadmin = False
+    db.commit()
+    logger.info("Super admin révoqué user=%s par %s", user.email, current.get("user_id"))
+    return {"message": f"{user.email} n'est plus super administrateur"}

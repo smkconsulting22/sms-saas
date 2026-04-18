@@ -9,7 +9,7 @@ VALID_PAYMENT_METHODS = {"orange_money", "wave"}
 
 class RechargeRequestCreate(BaseModel):
     amount_requested: int = Field(gt=0, description="Nombre de crédits demandés")
-    amount_paid: Decimal = Field(gt=0, description="Montant payé en FCFA")
+    amount_paid: Optional[Decimal] = Field(default=None, description="Montant payé en FCFA (optionnel)")
     payment_method: str = Field(description="'orange_money' ou 'wave'")
     payment_reference: str = Field(min_length=3, description="Référence de la transaction")
     note: Optional[str] = Field(default=None, max_length=255)

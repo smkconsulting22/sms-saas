@@ -1,4 +1,5 @@
 import logging
+import traceback
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -52,18 +53,27 @@ def create_recharge_request(
     """Soumet une demande de rechargement (client admin)."""
     tenant_id = current["tenant_id"]
 
-    req = RechargeRequest(
-        tenant_id=tenant_id,
-        amount_requested=payload.amount_requested,
-        amount_paid=payload.amount_paid,
-        payment_method=payload.payment_method,
-        payment_reference=payload.payment_reference,
-        status="pending",
-        note=payload.note,
-    )
-    db.add(req)
-    db.commit()
-    db.refresh(req)
+    try:
+        req = RechargeRequest(
+            tenant_id=tenant_id,
+            amount_requested=payload.amount_requested,
+            amount_paid=payload.amount_paid,
+            payment_method=payload.payment_method,
+            payment_reference=payload.payment_reference,
+            status="pending",
+            note=payload.note,
+        )
+        db.add(req)
+        db.commit()
+        db.refresh(req)
+    except Exception:
+        db.rollback()
+        logger.error(
+            "Erreur création demande rechargement tenant=%s :\n%s",
+            tenant_id, traceback.format_exc(),
+        )
+        raise HTTPException(status_code=500, detail="Erreur lors de la création de la demande")
+
     logger.info(
         "Demande rechargement créée id=%s tenant=%s amount=%d method=%s",
         req.id, tenant_id, payload.amount_requested, payload.payment_method,
@@ -72,19 +82,19 @@ def create_recharge_request(
     # Notifier le super admin — non bloquant
     try:
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-        tenant_name = tenant.name if tenant else tenant_id
+        tenant_name = tenant.name if tenant else str(tenant_id)
         dashboard_url = f"{settings.FRONTEND_URL}/admin/recharge"
         send_recharge_notification_superadmin(
             to=settings.SMTP_USER,
             tenant_name=tenant_name,
             amount_requested=payload.amount_requested,
-            amount_paid=str(payload.amount_paid),
+            amount_paid=str(payload.amount_paid) if payload.amount_paid is not None else "N/A",
             payment_method=payload.payment_method,
             payment_reference=payload.payment_reference,
             dashboard_url=dashboard_url,
         )
     except Exception:
-        pass
+        logger.warning("Notification super admin échouée :\n%s", traceback.format_exc())
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     return _recharge_to_dict(req, tenant.name if tenant else None)

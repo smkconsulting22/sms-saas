@@ -16,6 +16,7 @@ class CampaignOut(BaseModel):
     total: int
     sent: int
     failed: int
+    scheduled_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:

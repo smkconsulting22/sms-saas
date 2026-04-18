@@ -1,4 +1,5 @@
 import logging
+import traceback
 import emails as emails_pkg
 from app.config import settings
 
@@ -6,15 +7,15 @@ logger = logging.getLogger(__name__)
 
 
 def send_email(to: str, subject: str, html_body: str) -> bool:
-    """Envoie un email HTML via SMTP. Retourne True en cas de succès."""
-    if not settings.SMTP_USER or not settings.SMTP_HOST:
-        logger.warning("SMTP non configuré — email non envoyé à %s", to)
+    """Envoie un email HTML via SMTP (STARTTLS port 587). Retourne True en cas de succès."""
+    if not settings.SMTP_HOST or not settings.SMTP_USER:
+        logger.warning("SMTP non configuré (SMTP_HOST ou SMTP_USER vide) — email non envoyé à %s", to)
         return False
     try:
         message = emails_pkg.html(
             html=html_body,
             subject=subject,
-            mail_from=("SMS SaaS CI", settings.SMTP_USER),
+            mail_from=f"SMS SaaS CI <{settings.SMTP_USER}>",
         )
         smtp_params: dict = {
             "host": settings.SMTP_HOST,
@@ -25,17 +26,28 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
         }
         if settings.SMTP_PORT == 465:
             smtp_params["ssl"] = True
-        elif settings.SMTP_TLS:
+        else:
+            # Port 587 (et autres) → STARTTLS
             smtp_params["tls"] = True
 
+        logger.info(
+            "Envoi email host=%s port=%d to=%s subject=%r",
+            settings.SMTP_HOST, settings.SMTP_PORT, to, subject,
+        )
         response = message.send(to=to, smtp=smtp_params)
         if response.status_code not in (250,):
-            logger.error("Échec envoi email à %s : %s", to, response.status_text)
+            logger.error(
+                "Échec envoi email to=%s subject=%r status=%s text=%s",
+                to, subject, response.status_code, response.status_text,
+            )
             return False
-        logger.info("Email envoyé à %s : %s", to, subject)
+        logger.info("Email envoyé avec succès to=%s subject=%r", to, subject)
         return True
-    except Exception as exc:
-        logger.error("Erreur email à %s : %s", to, exc)
+    except Exception:
+        logger.error(
+            "Exception lors de l'envoi email to=%s subject=%r :\n%s",
+            to, subject, traceback.format_exc(),
+        )
         return False
 
 

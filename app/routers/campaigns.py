@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 from app.database import get_db
 from app.models.campaign import Campaign, CampaignStatus
@@ -19,11 +19,13 @@ def create_campaign(
     db: Session = Depends(get_db),
     current: dict = Depends(get_current_tenant)
 ):
+    status_val = "scheduled" if payload.scheduled_at else "draft"
     campaign = Campaign(
         tenant_id=current["tenant_id"],
         name=payload.name,
         message=payload.message,
-        scheduled_at=payload.scheduled_at
+        scheduled_at=payload.scheduled_at,
+        status=status_val,
     )
     db.add(campaign)
     db.commit()
@@ -32,12 +34,14 @@ def create_campaign(
 
 @router.get("/", response_model=List[CampaignOut])
 def list_campaigns(
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
     current: dict = Depends(get_current_tenant)
 ):
-    return db.query(Campaign).filter(
-        Campaign.tenant_id == current["tenant_id"]
-    ).order_by(Campaign.created_at.desc()).all()
+    q = db.query(Campaign).filter(Campaign.tenant_id == current["tenant_id"])
+    if status:
+        q = q.filter(Campaign.status == status)
+    return q.order_by(Campaign.created_at.desc()).all()
 
 @router.get("/{campaign_id}", response_model=CampaignOut)
 def get_campaign(

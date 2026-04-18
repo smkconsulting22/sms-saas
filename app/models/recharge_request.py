@@ -12,7 +12,7 @@ class RechargeRequest(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     amount_requested = Column(Integer, nullable=False)
-    amount_paid = Column(Numeric(10, 2), nullable=False)
+    amount_paid = Column(Numeric(10, 2), nullable=True)
     payment_method = Column(String(20), nullable=False)   # 'orange_money' | 'wave'
     payment_reference = Column(String(100), nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending | approved | rejected

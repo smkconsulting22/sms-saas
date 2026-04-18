@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.routers import auth, sms, contacts, campaigns, credits, tenants, recharge, account_requests
+from app.routers import auth, sms, contacts, campaigns, credits, tenants, recharge, account_requests, admin
 from app.dependencies import limiter
 from app.config import settings
 from app.logging_config import setup_logging
@@ -60,6 +60,7 @@ app.include_router(credits.router)
 app.include_router(tenants.router)
 app.include_router(recharge.router)
 app.include_router(account_requests.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

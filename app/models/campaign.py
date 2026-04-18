@@ -8,6 +8,7 @@ from app.database import Base
 
 class CampaignStatus(str, enum.Enum):
     DRAFT = "draft"
+    SCHEDULED = "scheduled"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
