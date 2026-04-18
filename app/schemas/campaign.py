@@ -8,6 +8,11 @@ class CampaignCreate(BaseModel):
     message: str
     scheduled_at: Optional[datetime] = None
 
+class CampaignUpdate(BaseModel):
+    name: Optional[str] = None
+    message: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+
 class CampaignOut(BaseModel):
     id: UUID
     name: str

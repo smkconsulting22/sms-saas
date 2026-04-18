@@ -5,8 +5,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from app.database import get_db
 from app.models.campaign import Campaign, CampaignStatus
-from app.schemas.campaign import CampaignCreate, CampaignOut
-from app.dependencies import get_current_tenant
+from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut
+from app.dependencies import get_current_tenant, require_admin
 from app.services.campaign import run_campaign
 from app.tasks.sms_tasks import launch_campaign_task
 
@@ -101,6 +101,62 @@ async def launch_campaign(
         }
     
     
+@router.patch("/{campaign_id}", response_model=CampaignOut)
+def update_campaign(
+    campaign_id: str,
+    payload: CampaignUpdate,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_admin),
+):
+    campaign = db.query(Campaign).filter(
+        Campaign.id == campaign_id,
+        Campaign.tenant_id == current["tenant_id"],
+    ).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campagne introuvable")
+    if campaign.status != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Impossible de modifier une campagne au statut '{campaign.status}' (draft requis)",
+        )
+    if payload.name is not None:
+        campaign.name = payload.name
+    if payload.message is not None:
+        campaign.message = payload.message
+    if payload.scheduled_at is not None:
+        campaign.scheduled_at = payload.scheduled_at
+        campaign.status = "scheduled"
+    db.commit()
+    db.refresh(campaign)
+    logger.info("Campagne modifiée campaign_id=%s tenant=%s", campaign_id, current["tenant_id"])
+    return campaign
+
+
+@router.post("/{campaign_id}/relaunch")
+def relaunch_campaign(
+    campaign_id: str,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_admin),
+):
+    campaign = db.query(Campaign).filter(
+        Campaign.id == campaign_id,
+        Campaign.tenant_id == current["tenant_id"],
+    ).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campagne introuvable")
+    if campaign.status != "failed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Seules les campagnes en échec peuvent être relancées (statut actuel : '{campaign.status}')",
+        )
+    campaign.status = "draft"
+    db.commit()
+    db.refresh(campaign)
+    launch_campaign_task.delay(str(campaign.id), current["tenant_id"])
+    logger.info("Campagne relancée campaign_id=%s tenant=%s", campaign_id, current["tenant_id"])
+    return campaign
+
+
 @router.delete("/{campaign_id}")
 def delete_campaign(
     campaign_id: str,
