@@ -3,6 +3,7 @@ import smtplib
 import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -177,7 +178,7 @@ def send_recharge_notification_superadmin(
 
 
 def send_recharge_approved_email(
-    to: str, tenant_name: str, amount_requested: int, new_balance: int, note: str | None
+    to: str, tenant_name: str, amount_requested: int, new_balance: int, note: Optional[str]
 ) -> None:
     note_block = (
         f'<p style="background:#f0fdf4;padding:12px;border-left:4px solid #16a34a;margin:16px 0">'
@@ -292,7 +293,7 @@ def send_account_request_superadmin(
     company_name: str,
     email: str,
     phone: str,
-    message: str | None,
+    message: Optional[str],
     dashboard_url: str,
 ) -> None:
     """Email de notification envoyé au super admin pour chaque nouvelle demande."""

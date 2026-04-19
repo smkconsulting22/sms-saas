@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class SMSSend(BaseModel):
     recipient: str
@@ -7,4 +8,4 @@ class SMSSend(BaseModel):
 class SMSResponse(BaseModel):
     status: str
     recipient: str
-    message_id: str | None = None
+    message_id: Optional[str] = None

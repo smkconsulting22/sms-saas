@@ -1,6 +1,6 @@
 from alembic import op
 
-revision = '009_account_request_phone_nullable'
+revision = '009_phone_nullable'
 down_revision = '008_tenant_sms_price'
 branch_labels = None
 depends_on = None

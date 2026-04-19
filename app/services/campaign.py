@@ -2,6 +2,7 @@ import csv
 import io
 import asyncio
 import logging
+from typing import Optional
 import phonenumbers
 import openpyxl
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 LOW_BALANCE_THRESHOLD = 10
 
 
-def validate_phone(phone: str) -> str | None:
+def validate_phone(phone: str) -> Optional[str]:
     """Retourne le numéro formaté E.164 ou None si invalide"""
     try:
         # Nettoyer le numéro
