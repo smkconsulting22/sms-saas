@@ -1,49 +1,62 @@
 import logging
+import smtplib
 import traceback
-import emails as emails_pkg
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 def send_email(to: str, subject: str, html_body: str) -> bool:
-    """Envoie un email HTML via SMTP (STARTTLS port 587). Retourne True en cas de succès."""
-    if not settings.SMTP_HOST or not settings.SMTP_USER:
-        logger.warning("SMTP non configuré (SMTP_HOST ou SMTP_USER vide) — email non envoyé à %s", to)
-        return False
-    try:
-        message = emails_pkg.html(
-            html=html_body,
-            subject=subject,
-            mail_from=f"SMS SaaS CI <{settings.SMTP_USER}>",
-        )
-        smtp_params: dict = {
-            "host": settings.SMTP_HOST,
-            "port": settings.SMTP_PORT,
-            "user": settings.SMTP_USER,
-            "password": settings.SMTP_PASSWORD,
-            "timeout": 10,
-        }
-        if settings.SMTP_PORT == 465:
-            smtp_params["ssl"] = True
-        else:
-            # Port 587 (et autres) → STARTTLS
-            smtp_params["tls"] = True
+    """Envoie un email HTML via SMTP. Retourne True en cas de succès."""
+    host = settings.SMTP_HOST
+    port = settings.SMTP_PORT
+    user = settings.SMTP_USER
+    password = settings.SMTP_PASSWORD
 
-        logger.info(
-            "Envoi email host=%s port=%d to=%s subject=%r",
-            settings.SMTP_HOST, settings.SMTP_PORT, to, subject,
-        )
-        response = message.send(to=to, smtp=smtp_params)
-        if response.status_code not in (250,):
-            logger.error(
-                "Échec envoi email to=%s subject=%r status=%s text=%s",
-                to, subject, response.status_code, response.status_text,
-            )
-            return False
+    # SMTP_USER vide = SMTP non configuré (SMTP_HOST a un défaut non vide)
+    if not user:
+        print("[EMAIL] SMTP non configuré (SMTP_USER vide) — envoi ignoré")
+        logger.warning("SMTP non configuré — email non envoyé à %s", to)
+        return False
+
+    print(f"[EMAIL] Config: host={host} port={port} user={user}")
+    print(f"[EMAIL] Tentative envoi à {to} via {host}:{port}")
+    logger.info("Tentative envoi email to=%s host=%s port=%d subject=%r", to, host, port, subject)
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"WidoZan <{user}>"
+        msg["To"] = to
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        if port == 465:
+            # SSL natif
+            with smtplib.SMTP_SSL(host, port, timeout=10) as smtp:
+                smtp.login(user, password)
+                smtp.sendmail(user, [to], msg.as_string())
+        elif port == 587:
+            # STARTTLS
+            with smtplib.SMTP(host, port, timeout=10) as smtp:
+                smtp.ehlo()
+                smtp.starttls()
+                smtp.ehlo()
+                smtp.login(user, password)
+                smtp.sendmail(user, [to], msg.as_string())
+        else:
+            # Port 25 ou autre — pas de TLS
+            with smtplib.SMTP(host, port, timeout=10) as smtp:
+                smtp.login(user, password)
+                smtp.sendmail(user, [to], msg.as_string())
+
+        print(f"[EMAIL] Succès envoi à {to}")
         logger.info("Email envoyé avec succès to=%s subject=%r", to, subject)
         return True
-    except Exception:
+
+    except Exception as e:
+        print(f"[EMAIL] ERREUR: {str(e)}")
         logger.error(
             "Exception lors de l'envoi email to=%s subject=%r :\n%s",
             to, subject, traceback.format_exc(),
