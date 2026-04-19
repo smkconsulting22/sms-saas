@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from app.config import settings
 
 celery_app = Celery(
@@ -14,7 +15,12 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="Africa/Abidjan",
     enable_utc=True,
-    # Retry automatique en cas d'échec
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+    beat_schedule={
+        "check-scheduled-campaigns": {
+            "task": "app.tasks.sms_tasks.check_scheduled_campaigns",
+            "schedule": 60.0,  # toutes les 60 secondes
+        },
+    },
 )

@@ -1,5 +1,6 @@
 import logging
 import asyncio
+from datetime import datetime, timezone
 from app.workers.celery_app import celery_app
 from app.database import SessionLocal
 from app.services.campaign import run_campaign
@@ -29,5 +30,45 @@ def launch_campaign_task(self, campaign_id: str, tenant_id: str):
             str(exc),
         )
         raise self.retry(exc=exc)
+    finally:
+        db.close()
+
+
+@celery_app.task
+def check_scheduled_campaigns():
+    """Vérifie toutes les minutes les campagnes planifiées dont l'heure est passée
+    et les lance. Passe le statut à 'running' avant d'envoyer la tâche pour éviter
+    les doubles lancements en cas de chevauchement de beat."""
+    from app.models.campaign import Campaign
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        campaigns = (
+            db.query(Campaign)
+            .filter(
+                Campaign.status == "scheduled",
+                Campaign.scheduled_at <= now,
+            )
+            .all()
+        )
+        if not campaigns:
+            return
+
+        logger.info("Beat: %d campagne(s) planifiée(s) à lancer", len(campaigns))
+
+        for campaign in campaigns:
+            # Marquer immédiatement pour éviter un double lancement
+            campaign.status = "running"
+
+        db.commit()
+
+        for campaign in campaigns:
+            launch_campaign_task.delay(str(campaign.id), str(campaign.tenant_id))
+            logger.info(
+                "Beat: campagne lancée campaign_id=%s tenant_id=%s",
+                campaign.id, campaign.tenant_id,
+            )
+    except Exception as exc:
+        logger.error("Beat check_scheduled_campaigns erreur : %s", str(exc))
     finally:
         db.close()
