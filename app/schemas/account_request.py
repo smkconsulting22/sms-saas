@@ -17,7 +17,7 @@ class AccountRequestOut(BaseModel):
     full_name: str
     company_name: str
     email: str
-    phone: str
+    phone: Optional[str] = None
     message: Optional[str]
     status: str
     rejection_reason: Optional[str]

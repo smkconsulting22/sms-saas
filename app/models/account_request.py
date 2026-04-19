@@ -12,7 +12,7 @@ class AccountRequest(Base):
     full_name = Column(String(100), nullable=False)
     company_name = Column(String(100), nullable=False)
     email = Column(String(255), nullable=False)
-    phone = Column(String(20), nullable=False)
+    phone = Column(String(20), nullable=True)
     message = Column(String(500), nullable=True)
     status = Column(String(20), nullable=False, default="pending")  # pending | approved | rejected
     rejection_reason = Column(String(255), nullable=True)

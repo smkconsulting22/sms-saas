@@ -2,6 +2,7 @@ import logging
 import re
 import secrets
 import string
+import traceback
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -93,27 +94,36 @@ def submit_account_request(
             detail="Une demande est déjà en cours ou a déjà été approuvée pour cet email.",
         )
 
-    req = AccountRequest(
-        full_name=payload.full_name,
-        company_name=payload.company_name,
-        email=payload.email,
-        phone=payload.phone,
-        message=payload.message,
-        status="pending",
-    )
-    db.add(req)
-    db.commit()
-    db.refresh(req)
+    try:
+        req = AccountRequest(
+            full_name=payload.full_name,
+            company_name=payload.company_name,
+            email=payload.email,
+            phone=payload.phone,
+            message=payload.message,
+            status="pending",
+        )
+        db.add(req)
+        db.commit()
+        db.refresh(req)
+    except Exception:
+        db.rollback()
+        tb = traceback.format_exc()
+        print(f"[ACCOUNT_REQUEST] ERREUR db.commit : {tb}")
+        logger.error("Erreur création demande de compte email=%s :\n%s", payload.email, tb)
+        raise HTTPException(status_code=500, detail="Erreur lors de la soumission de la demande")
+
     logger.info(
         "Demande de compte soumise id=%s email=%s company=%s",
         req.id, req.email, req.company_name,
     )
+    print(f"[ACCOUNT_REQUEST] Demande créée id={req.id} email={req.email}")
 
     # Emails — non bloquants
     try:
         send_account_request_confirmation(req.email, req.full_name, req.company_name)
     except Exception:
-        pass
+        print(f"[ACCOUNT_REQUEST] Email confirmation échoué : {traceback.format_exc()}")
     try:
         dashboard_url = f"{settings.FRONTEND_URL}/admin/account-requests"
         send_account_request_superadmin(
@@ -121,12 +131,12 @@ def submit_account_request(
             full_name=req.full_name,
             company_name=req.company_name,
             email=req.email,
-            phone=req.phone,
+            phone=req.phone or "—",
             message=req.message,
             dashboard_url=dashboard_url,
         )
     except Exception:
-        pass
+        print(f"[ACCOUNT_REQUEST] Email superadmin échoué : {traceback.format_exc()}")
 
     return {
         "message": (
