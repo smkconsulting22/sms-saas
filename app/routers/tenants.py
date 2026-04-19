@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -10,7 +11,8 @@ from app.models.credit import CreditBalance
 from app.models.contact import Contact
 from app.models.campaign import Campaign
 from app.dependencies import require_admin, require_superadmin
-from app.schemas.tenant import TenantUpdate, SenderNameUpdate
+from app.schemas.tenant import TenantUpdate, SenderNameUpdate, SenderNameRequest, SenderNameStatusUpdate
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
@@ -50,6 +52,11 @@ def get_my_tenant(
         "credits_balance": balance.balance if balance else 0,
         "contacts_count": contacts_count,
         "campaigns_count": campaigns_count,
+        "sender_name_requested": tenant.sender_name_requested,
+        "sender_name_status": tenant.sender_name_status,
+        "sender_name_requested_at": tenant.sender_name_requested_at,
+        "sender_name_approved_at": tenant.sender_name_approved_at,
+        "sender_name_rejection_reason": tenant.sender_name_rejection_reason,
     }
 
 
@@ -90,6 +97,48 @@ def update_my_sender_name(
     return {
         "message": "Sender name mis à jour",
         "sender_name": tenant.sender_name,
+    }
+
+
+@router.post("/me/sender-name-request", status_code=201)
+def request_sender_name(
+    payload: SenderNameRequest,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_admin),
+):
+    """Soumet une demande d'approbation de sender name personnalisé."""
+    from app.services.email import send_sender_name_request_superadmin
+
+    tenant_id = current["tenant_id"]
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+
+    if tenant.sender_name_status == "pending":
+        raise HTTPException(status_code=409, detail="Une demande est déjà en cours de traitement")
+
+    tenant.sender_name_requested = payload.sender_name
+    tenant.sender_name_status = "pending"
+    tenant.sender_name_requested_at = datetime.now(timezone.utc)
+    tenant.sender_name_approved_at = None
+    tenant.sender_name_rejection_reason = None
+    db.commit()
+
+    superadmins = db.query(User).filter(User.role == "superadmin", User.is_active == True).all()
+    dashboard_url = f"{settings.FRONTEND_URL}/admin/tenants/{tenant_id}"
+    for sa in superadmins:
+        send_sender_name_request_superadmin(
+            to=sa.email,
+            tenant_name=tenant.name,
+            sender_name_requested=payload.sender_name,
+            dashboard_url=dashboard_url,
+        )
+
+    logger.info("Sender name request tenant=%s requested=%s", tenant_id, payload.sender_name)
+    return {
+        "message": "Demande soumise — en attente d'approbation",
+        "sender_name_requested": tenant.sender_name_requested,
+        "sender_name_status": tenant.sender_name_status,
     }
 
 
@@ -217,6 +266,74 @@ def update_tenant(
         "sender_name": tenant.sender_name,
         "sms_price": float(tenant.sms_price) if tenant.sms_price is not None else 20.0,
     }
+
+
+@router.patch("/{tenant_id}/sender-name")
+def review_sender_name(
+    tenant_id: str,
+    payload: SenderNameStatusUpdate,
+    db: Session = Depends(get_db),
+    current: dict = Depends(require_superadmin),
+):
+    """Approuve ou refuse une demande de sender name (super admin uniquement)."""
+    from app.services.email import send_sender_name_approved_email, send_sender_name_rejected_email
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant introuvable")
+    if tenant.sender_name_status != "pending":
+        raise HTTPException(status_code=409, detail="Aucune demande en attente pour ce tenant")
+
+    tenant_admin = (
+        db.query(User)
+        .filter(User.tenant_id == tenant_id, User.role == "admin", User.is_active == True)
+        .first()
+    )
+
+    if payload.status == "approved":
+        tenant.sender_name = tenant.sender_name_requested
+        tenant.sender_name_status = "approved"
+        tenant.sender_name_approved_at = datetime.now(timezone.utc)
+        tenant.sender_name_rejection_reason = None
+        db.commit()
+        logger.info(
+            "Sender name approuvé tenant=%s sender_name=%s par superadmin=%s",
+            tenant_id, tenant.sender_name, current.get("user_id"),
+        )
+        if tenant_admin:
+            send_sender_name_approved_email(
+                to=tenant_admin.email,
+                tenant_name=tenant.name,
+                sender_name=tenant.sender_name,
+            )
+        return {
+            "message": "Sender name approuvé",
+            "sender_name": tenant.sender_name,
+            "sender_name_status": tenant.sender_name_status,
+        }
+    else:
+        if not payload.rejection_reason:
+            raise HTTPException(status_code=422, detail="rejection_reason requis en cas de refus")
+        tenant.sender_name_status = "rejected"
+        tenant.sender_name_rejection_reason = payload.rejection_reason
+        tenant.sender_name_approved_at = None
+        db.commit()
+        logger.info(
+            "Sender name refusé tenant=%s reason=%s par superadmin=%s",
+            tenant_id, payload.rejection_reason, current.get("user_id"),
+        )
+        if tenant_admin:
+            send_sender_name_rejected_email(
+                to=tenant_admin.email,
+                tenant_name=tenant.name,
+                sender_name=tenant.sender_name_requested,
+                reason=payload.rejection_reason,
+            )
+        return {
+            "message": "Sender name refusé",
+            "sender_name_status": tenant.sender_name_status,
+            "rejection_reason": tenant.sender_name_rejection_reason,
+        }
 
 
 @router.get("/{tenant_id}/users")

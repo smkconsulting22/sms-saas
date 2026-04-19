@@ -376,6 +376,83 @@ def send_account_approved_email(
     send_email(to, "✅ Votre compte SMS SaaS CI est activé — Vos identifiants", html)
 
 
+def send_sender_name_request_superadmin(
+    to: str,
+    tenant_name: str,
+    sender_name_requested: str,
+    dashboard_url: str,
+) -> None:
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#f0f9ff">
+      <h2 style="color:#0369a1">🔔 Demande de sender name</h2>
+      <p>Le client <strong>{tenant_name}</strong> souhaite utiliser un sender name personnalisé.</p>
+      <table style="margin:24px 0;border-collapse:collapse;width:100%">
+        <tr style="background:#e0f2fe">
+          <td style="padding:10px;border:1px solid #7dd3fc">Client</td>
+          <td style="padding:10px;border:1px solid #7dd3fc;font-weight:bold">{tenant_name}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #7dd3fc">Sender name demandé</td>
+          <td style="padding:10px;border:1px solid #7dd3fc;font-weight:bold;font-family:monospace">{sender_name_requested}</td>
+        </tr>
+      </table>
+      <p style="margin:32px 0">
+        <a href="{dashboard_url}"
+           style="background:#0369a1;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">
+          Traiter la demande
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">WidoZan — Notification automatique</p>
+    </div>
+    """
+    send_email(to, f"[WidoZan] Demande sender name — {tenant_name}", html)
+
+
+def send_sender_name_approved_email(to: str, tenant_name: str, sender_name: str) -> None:
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#f0fdf4">
+      <h2 style="color:#16a34a">✅ Sender name approuvé</h2>
+      <p>Bonjour,</p>
+      <p>Votre demande de sender name pour le compte <strong>{tenant_name}</strong> a été approuvée.</p>
+      <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:20px;margin:24px 0;text-align:center">
+        <span style="font-family:monospace;font-size:22px;font-weight:bold;color:#166534">{sender_name}</span>
+      </div>
+      <p>Ce nom apparaîtra désormais comme expéditeur de vos SMS.</p>
+      <p style="margin:32px 0">
+        <a href="{settings.FRONTEND_URL}/dashboard"
+           style="background:#16a34a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">
+          Accéder à mon compte
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">L'équipe WidoZan</p>
+    </div>
+    """
+    send_email(to, f"✅ Sender name approuvé — {sender_name}", html)
+
+
+def send_sender_name_rejected_email(to: str, tenant_name: str, sender_name: str, reason: str) -> None:
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;background:#fff1f2">
+      <h2 style="color:#dc2626">❌ Demande de sender name refusée</h2>
+      <p>Bonjour,</p>
+      <p>Votre demande d'utilisation du sender name <strong style="font-family:monospace">{sender_name}</strong>
+         pour le compte <strong>{tenant_name}</strong> n'a pas pu être approuvée.</p>
+      <div style="background:#fee2e2;padding:16px;border-left:4px solid #dc2626;margin:24px 0;border-radius:4px">
+        <strong>Motif :</strong><br>{reason}
+      </div>
+      <p>Vous pouvez soumettre une nouvelle demande avec un sender name différent depuis votre espace client.</p>
+      <p style="margin:32px 0">
+        <a href="{settings.FRONTEND_URL}/dashboard/settings"
+           style="background:#dc2626;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">
+          Soumettre une nouvelle demande
+        </a>
+      </p>
+      <p style="color:#666;font-size:13px">L'équipe WidoZan</p>
+    </div>
+    """
+    send_email(to, f"❌ Demande sender name refusée — {tenant_name}", html)
+
+
 def send_account_rejected_email(to: str, full_name: str, reason: str) -> None:
     """Email envoyé au demandeur quand sa demande est refusée."""
     html = f"""
