@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
     FRONTEND_URL: str = "http://localhost:5173"
     SENTRY_DSN: str = ""
 

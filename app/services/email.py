@@ -32,24 +32,25 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
         msg["To"] = to
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        if port == 465:
-            # SSL natif
-            with smtplib.SMTP_SSL(host, port, timeout=10) as smtp:
-                smtp.login(user, password)
-                smtp.sendmail(user, [to], msg.as_string())
-        elif port == 587:
-            # STARTTLS
-            with smtplib.SMTP(host, port, timeout=10) as smtp:
-                smtp.ehlo()
-                smtp.starttls()
-                smtp.ehlo()
-                smtp.login(user, password)
-                smtp.sendmail(user, [to], msg.as_string())
+        use_ssl = (port == 465 or settings.SMTP_SSL)
+        print(f"[EMAIL] Mode: {'SSL' if use_ssl else ('STARTTLS' if settings.SMTP_TLS else 'plain')}")
+
+        if use_ssl:
+            print(f"[EMAIL] Connexion SMTP_SSL {host}:{port}")
+            server = smtplib.SMTP_SSL(host, port, timeout=10)
         else:
-            # Port 25 ou autre — pas de TLS
-            with smtplib.SMTP(host, port, timeout=10) as smtp:
-                smtp.login(user, password)
-                smtp.sendmail(user, [to], msg.as_string())
+            print(f"[EMAIL] Connexion SMTP {host}:{port}")
+            server = smtplib.SMTP(host, port, timeout=10)
+            server.ehlo()
+            if settings.SMTP_TLS:
+                print("[EMAIL] Début STARTTLS")
+                server.starttls()
+                server.ehlo()
+
+        print(f"[EMAIL] Login avec user={user}")
+        server.login(user, password)
+        server.sendmail(user, [to], msg.as_string())
+        server.quit()
 
         print(f"[EMAIL] Succès envoi à {to}")
         logger.info("Email envoyé avec succès to=%s subject=%r", to, subject)
